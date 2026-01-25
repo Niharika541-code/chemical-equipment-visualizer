@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title> Chemical Equipment Visualizer</title>
+        <!-- here we imported chart.js -->
+        <script src="chart.js"></script>
+    </head>
+    <body>
+        <h2>Chemical Equipment Parameter Visualizer</h2>
+        <!-- Here type file is used to choose file -->
+        <input type="file" id="csvFile">
+        <!-- here uploadfile which is a js function -->
+        <button type="button" onclick="uploadFile()">Upload</button> 
+
+        <!-- HERE IS THE UPLOAD BUTTON -->
+        <h3>Upload Result</h3>
+        <div>
+            <pre id="uploadResult"></pre>
+        </div>
+
+        <!-- HERE WE MAKE TABLE FOR THE PREVIEW  -->
+        <h3> CSV preview</h3>
+        <table border="1" id="previewTable"></table>
+
+        <!-- HERE IS THE EQUIPMENT TABLE -->
+        <h3>Equipment Type Table</h3>
+        <table border="1" id="resultTable">
+            <thead>
+                <tr>
+                    <th>Equipment Type</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+
+        <!-- Here we will create a dropdown for charts seletion -->
+        <h2> Parameter Chart</h2>
+        <select id ="paramSelect">
+           <option value="Flowrate">Flowrate</option>
+           <option value="Pressure">Pressure</option>
+           <option value="Temperature">Temperature</option>
+        </select>
+        <canvas id="paramChart" width="400" height="200"></canvas>
+        <!-- this is canvas where aur chart will be displayed -->
+        <div>
+            <canvas id="typeChart" width="400" height="250"></canvas>
+        </div>
+
+        <!-- HERE IS THE HISTORY BUTTON -->
+        <button type="button" onclick="loadHistory()">Load History</button>
+        <h3>History (Last 5)</h3>
+        <table border="1" id="historyTable">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Total Equipment</th>
+                    <th>Avg Flowrate</th>
+                    <th>Avg Pressure</th>
+                    <th>Avg Temperature</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+
+        <!-- from here all js code will run -->
+        <script>
+            let chartInstance = null;
+            function uploadFile(){
+                // this gets the file inputted
+                const fileInput = document.getElementById('csvFile');
+                // this get the 1st selected file
+                const file = fileInput.files[0];
+                if(!file){
+                    alert("Please select a CSV File");
+                    return;
+                }
+                // formdata() cerates a packet for sending files via HTTP
+                const formData = new FormData();
+                // key ='file' and value is selected csv file
+                formData.append("file",file);
+                fetch("http://127.0.0.1:8000/api/upload/", {
+                    method: "POST",
+                    body: formData
+                })// all the settign are same as i did in postman before
+                // fetch acts a postman inside my browser as i did earlier
+                .then(response => response.json())
+                .then(data => {
+                    // this will show the result 
+                    document.getElementById("uploadResult").textContent=JSON.stringify(data.summary,null,2);
+                    const tableBody = document.getElementById("tableBody");
+                    tableBody.innerHTML="";
+
+                    const typeDist = data.summary.type_distribution;
+                    for(const key in typeDist){
+                        const row = document.createElement("tr");
+                        const cellType = document.createElement("td");
+                        cellType.textContent = key;
+                        const cellCount = document.createElement("td");
+                        cellCount.textContent = typeDist[key];
+
+                        row.appendChild(cellType);
+                        row.appendChild(cellCount);
+                        tableBody.appendChild(row);
+                    }
+                    if (!data.summary.type_distribution) {
+                        console.error("type_distribution missing", data);
+                        return;
+                    }
+                    const labels = Object.keys(data.summary.type_distribution);
+                    const values = Object.values(data.summary.type_distribution);
+                    const ctx = document.getElementById('typeChart').getContext('2d');
+                    // this creates a new chart using ctx(where to draw)
+                    if(chartInstance){
+                        chartInstance.destroy();
+                    }
+                    chartInstance= new Chart(ctx, {
+                        type: 'bar', // bar chart
+                        data: {
+                            labels: labels, // created above
+                            datasets: [{ // things to plot on the chart
+                                label: 'Equipment Count',
+                                data: values // created above
+                            }]
+                        },
+                        options: {
+                            responsive: false
+                            }
+                    });
+                    document.getElementById("uploadResult").textContent = JSON.stringify(data.summary, null, 2);
+
+                    //================ CSV PREVIEW CODE ================= 
+                    const previewTable = document.getElementById("previewTable");
+                    previewTable.innerHTML="";
+                    const previewData = data.preview;
+                    if(previewData.length>0){
+                        const headerRow = document.createElement("tr");
+                        Object.keys(previewData[0]).forEach(key => {
+                            const th = document.createElement("th");
+                            th.textContent= key;
+                            headerRow.appendChild(th);
+                        });
+                        previewTable.appendChild(headerRow);
+                        previewData.forEach(rowObj => {
+                            const row = document.createElement("tr");
+                            Object.values(rowObj).forEach(val => {
+                                const td = document.createElement("td");
+                                td.textContent = val;
+                                row.appendChild(td);
+                            });
+                        previewTable.appendChild(row);
+                        });
+                    }
+                    //================= CSV PREVIEW ENDS HERE ==============
+
+                    //================= PARAMETER CHART HERE ================
+                    let ParamChartInstance = null;
+                    document.getElementById("paramSelect").addEventListener("change",function(){
+                        const selectedParam = this.value;
+                        const labels = data.preview.map(item => item["Equipment Name"]);
+                        const values = data.preview.map(item => item[selectedParam]);
+
+                        const ctx2 = document.getElementById("paramChart").getContext("2d");
+                        if(ParamChartInstance){
+                            ParamChartInstance.destroy();
+                        }
+                        ParamChartInstance = new chart(ctx2, {
+                            type: "bar",
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label : selectedParam,
+                                    data : values
+                                }]
+                            }
+                        });
+                    });
+                    //================== PARAMETER CHART ENDS HERE =================
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                });
+            }
+            function loadHistory(){
+                fetch("http://127.0.0.1:8000/api/history/")
+                .then(response => response.json())
+                .then(data => {
+                    const historyBody = document.getElementById("historyBody");
+                    historyBody.innerHTML="";
+                    for(let i=0;i<data.length;i++){
+                        const row = document.createElement("tr");
+                        const cellTime = document.createElement("td");
+                        cellTime.textContent = data[i].time;
+                        const cellTotal = document.createElement("td");
+                        cellTotal.textContent = data[i].total_equipment;
+                        const cellFlow = document.createElement("td");
+                        cellFlow.textContent = data[i].avg_flowrate;
+                        const cellPressure = document.createElement("td");
+                        cellPressure.textContent = data[i].avg_pressure;
+                        const cellTemp = document.createElement("td");
+                        cellTemp.textContent = data[i].avg_temperature;
+
+                        row.appendChild(cellTime);
+                        row.appendChild(cellTotal);
+                        row.appendChild(cellFlow);
+                        row.appendChild(cellPressure);
+                        row.appendChild(cellTemp);
+
+                        historyBody.appendChild(row);
+                    }
+                    
+                })
+                .catch(error => {
+                    console.error("Error Loading the History:",error);
+                });
+            }
+        </script>
+    </body>
+</html>
