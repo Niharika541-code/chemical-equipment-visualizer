@@ -1,132 +1,138 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { Bar } from "react-chartjs-2";
-import "./App.css";
-
+import React, { useState } from 'react';
+import axios from 'axios';
+import './App.css';
+import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
+  Title,
   Tooltip,
   Legend
-);
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   /* ================= AUTH ================= */
   const [token, setToken] = useState(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
 
   /* ================= DATA ================= */
-  const [file, setFile] = useState(null);
-  const [summary, setSummary] = useState(null);
-
-  /* ================= TIME ================= */
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [results, setResults] = useState(null);
+  const [historyList, setHistoryList] = useState([]);
 
   /* ================= LOGIN ================= */
   const loginUser = async () => {
     try {
-      const res = await axios.post("http://127.0.0.1:8000/api/login/", {
-        username,
-        password,
-      });
-      setToken(res.data.token);
-    } catch {
-      alert("Invalid credentials");
+      const res = await axios.post(
+        "http://127.0.0.1:8000/api/login/",
+        { username, password }
+      );
+      setToken(res.data.token);        
+      setAuthenticated(true);
+    } catch (err) {
+      alert("Invalid username or password");
     }
   };
 
-  /* ================= CREATE USER ================= */
-  const createUser = async () => {
-    try {
-      await axios.post("http://127.0.0.1:8000/api/create-user/", {
-        username,
-        password,
-      });
-      alert("User created successfully! Please login.");
-      setIsCreatingUser(false);
-    } catch {
-      alert("User already exists or error occurred");
-    }
+  /* ================= FILE ================= */
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
   };
 
-  /* ================= FILE UPLOAD ================= */
-  const uploadFile = async () => {
-    if (!file) return alert("Select CSV first");
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      alert("Please choose a CSV file first!");
+      return;
+    }
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", selectedFile);
 
     try {
-      const res = await axios.post(
+      const response = await axios.post(
         "http://127.0.0.1:8000/api/upload/",
         formData,
-        { headers: { Authorization: `Token ${token}` } }
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
-      setSummary(res.data.summary);
-    } catch {
-      alert("Upload failed");
+      setResults(response.data.summary);
+      loadHistory();
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Upload failed (Unauthorized or backend error)");
     }
   };
 
   const loadHistory = async () => {
-    await axios.get("http://127.0.0.1:8000/api/history/", {
-      headers: { Authorization: `Token ${token}` },
-    });
-    alert("History loaded (check table if enabled)");
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/api/history/",
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+      setHistoryList(response.data);
+    } catch (err) {
+      console.error("History error:", err);
+    }
   };
 
-  const downloadReport = () => {
-    window.open("http://127.0.0.1:8000/api/report/", "_blank");
+  /* ================= CHART ================= */
+  const chartData = {
+    labels: results ? Object.keys(results.type_distribution) : [],
+    datasets: [
+      {
+        label: "Count",
+        data: results ? Object.values(results.type_distribution) : [],
+        backgroundColor: "#0ea5e9",
+        borderRadius: 5,
+      },
+    ],
   };
 
   /* ================= LOGIN SCREEN ================= */
-  if (!token) {
+  if (!authenticated) {
     return (
-      <div className="login-bg">
+      <div className="login-container">
         <div className="login-card">
-          <h2>CHEM-VIZ</h2>
+          <h2 style={{ color: "#0ea5e9", marginBottom: "5px" }}>CHEMVIZ</h2>
+          <p style={{ color: "#64748b", fontSize: "12px", marginBottom: "25px" }}>
+            Portal Login
+          </p>
 
           <input
+            className="input-field"
+            type="text"
             placeholder="Username"
             onChange={(e) => setUsername(e.target.value)}
           />
           <input
+            className="input-field"
             type="password"
             placeholder="Password"
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          {!isCreatingUser ? (
-            <>
-              <button onClick={loginUser}>Login</button>
-              <p className="link" onClick={() => setIsCreatingUser(true)}>
-                Create new user
-              </p>
-            </>
-          ) : (
-            <>
-              <button onClick={createUser}>Create User</button>
-              <p className="link" onClick={() => setIsCreatingUser(false)}>
-                Back to login
-              </p>
-            </>
-          )}
+          <button
+            className="btn-blue"
+            style={{ width: "100%" }}
+            onClick={loginUser}
+          >
+            AUTHENTICATE
+          </button>
         </div>
       </div>
     );
@@ -134,78 +140,133 @@ function App() {
 
   /* ================= DASHBOARD ================= */
   return (
-    <div className="layout">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
+    <div className="dashboard-main">
+      <div className="header-section">
         <div>
-          <div className="logo">🧪 CHEM-VIZ</div>
-
-          <p className="section-title">Data Upload</p>
-          <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-          <button onClick={uploadFile}>Upload CSV</button>
-          <button onClick={loadHistory}>Load History</button>
+          <h2 style={{ margin: 0 }}>Equipment Visualizer</h2>
+          <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>
+            System Version 2.0.5
+          </p>
         </div>
 
-        <div className="sidebar-footer">
-          <div className="big-time">
-            {time.toLocaleDateString()} <br />
-            {time.toLocaleTimeString()}
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <input type="file" onChange={handleFileChange} />
+          <button className="btn-blue" onClick={handleUpload}>
+            UPLOAD CSV
+          </button>
+          <button
+            onClick={() => {
+              setAuthenticated(false);
+              setToken(null);
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#ef4444",
+              cursor: "pointer",
+              fontWeight: "600",
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-box">
+          <div className="stat-title">Total Equipment</div>
+          <p className="stat-value">{results?.total_equipment || 0}</p>
+        </div>
+        <div className="stat-box">
+          <div className="stat-title">Avg Flowrate (L/min)</div>
+          <p className="stat-value">
+            {results?.avg_flowrate?.toFixed(2) || "0.00"}
+          </p>
+        </div>
+        <div className="stat-box">
+          <div className="stat-title">Avg Temp (°C)</div>
+          <p className="stat-value">
+            {results?.avg_temperature || "0.0"}
+          </p>
+        </div>
+      </div>
+
+      <div className="content-grid">
+        <div className="visual-card">
+          <h4 style={{ marginTop: 0, marginBottom: "20px" }}>
+            Distribution Map
+          </h4>
+          <div style={{ height: "300px" }}>
+            <Bar
+              data={chartData}
+              options={{ responsive: true, maintainAspectRatio: false }}
+            />
           </div>
-          <div className="user-btn">👤 {username}</div>
         </div>
-      </aside>
 
-      {/* MAIN */}
-      <main className="dashboard">
-        <header className="topbar">
-          <h2>Chemical Equipment Parameter Visualizer</h2>
-        </header>
+        <div className="visual-card">
+          <h4 style={{ marginTop: 0, marginBottom: "20px" }}>
+            Raw Output
+          </h4>
+          <pre>
+            {results
+              ? JSON.stringify(results, null, 2)
+              : "// Awaiting data upload..."}
+          </pre>
+        </div>
+      </div>
 
-        {summary && (
-          <>
-            <div className="cards">
-              <div className="card">
-                <p>Total Equipment</p>
-                <h1>{summary.total_equipment}</h1>
-              </div>
-              <div className="card">
-                <p>Avg Flowrate</p>
-                <h1>{summary.avg_flowrate}</h1>
-              </div>
-              <div className="card">
-                <p>Avg Pressure</p>
-                <h1>{summary.avg_pressure}</h1>
-              </div>
-              <div className="card">
-                <p>Avg Temperature</p>
-                <h1>{summary.avg_temperature}</h1>
-              </div>
-            </div>
+      <div className="table-wrapper">
+        <div
+          style={{
+            padding: "15px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            borderBottom: "1px solid var(--border-color)",
+          }}
+        >
+          <h4 style={{ margin: 0 }}>Last 5 Uploads</h4>
+          <button
+            onClick={loadHistory}
+            style={{
+              color: "#0ea5e9",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            REFRESH
+          </button>
+        </div>
 
-            <div className="grid">
-              <div className="panel">
-                <Bar
-                  data={{
-                    labels: Object.keys(summary.type_distribution),
-                    datasets: [
-                      {
-                        label: "Equipment",
-                        data: Object.values(summary.type_distribution),
-                        backgroundColor: "#3b82f6",
-                      },
-                    ],
-                  }}
-                />
-              </div>
-
-              <div className="panel">
-                <pre>{JSON.stringify(summary, null, 2)}</pre>
-                <button onClick={downloadReport}>Download PDF</button>
-              </div>
-            </div>
-          </>
-        )}
-      </main>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Count</th>
+              <th>Flowrate</th>
+              <th>Pressure</th>
+              <th>Temperature</th>
+            </tr>
+          </thead>
+          <tbody>
+            {historyList.map((item, idx) => (
+              <tr key={idx}>
+                <td style={{ color: "#64748b" }}>{item.time}</td>
+                <td>{item.total_equipment}</td>
+                <td>{item.avg_flowrate?.toFixed(2)}</td>
+                <td>{item.avg_pressure?.toFixed(2)}</td>
+                <td
+                  style={{ color: "#0ea5e9", fontWeight: "bold" }}
+                >
+                  {item.avg_temperature}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
