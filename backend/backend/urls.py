@@ -21,8 +21,9 @@ from equipment import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/upload/', views.upload_csv),
-    path('api/history/',views.history),
-    path('api/report/', views.generate_report),
-    path("api/login/", views.login_view),
+    path('api/upload/', views.upload_csv,name='upload'),
+    path('api/history/',views.history,name='history'),
+    path('api/generate-pdf-report/', views.generate_pdf_report, name='generate_pdf_report'),
+    path("api/login/", views.login_view,name='login'),
+
 ]

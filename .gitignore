@@ -1,18 +1,13 @@
-# Python
+# Excel files
+*.xlsx
+*.xls
+
+# Python cache
 __pycache__/
 *.pyc
-env/
-venv/
 
-# Django
-db.sqlite3
-*.log
-
-# React
+# Node
 node_modules/
-build/
-.env
 
-# OS
-.DS_Store
-Thumbs.db
+# VS Code
+.vscode/
