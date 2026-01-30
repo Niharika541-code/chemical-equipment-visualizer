@@ -9,7 +9,7 @@ A hybrid web and desktop application for visualizing and analyzing chemical equi
 
 ## 🎥 Demo Video
 
-**[▶️ Watch Full Demo Video](https://youtu.be/mgAO-5qSa7U)**
+**[▶️ Watch Full Demo Video](https://youtu.be/sUVTUtpQEwo?si=MV5NZbFmk1Ju0-kw)**
 
 ## 📋 Table of Contents
 - [Project Overview](#project-overview)
