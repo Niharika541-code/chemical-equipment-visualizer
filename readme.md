@@ -7,6 +7,10 @@ A hybrid web and desktop application for visualizing and analyzing chemical equi
 ![Django](https://img.shields.io/badge/django-5.2.7-green.svg)
 ![React](https://img.shields.io/badge/react-18+-61DAFB.svg)
 
+## 🎥 Demo Video
+
+**[▶️ Watch Full Demo Video](https://youtu.be/mgAO-5qSa7U)**
+
 ## 📋 Table of Contents
 - [Project Overview](#project-overview)
 - [Features](#features)
